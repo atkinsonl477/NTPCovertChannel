@@ -43,12 +43,30 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
     #Fixed-64 values
     reference_timestamp = pack_fixed64(response.ref_timestamp)
     origin_timestamp = pack_fixed64(response.orig_timestamp)
-    receive_timestamp = pack_fixed64(response.recv_timestamp)
+    receive_timestamp = bytearray(pack_fixed64(response.recv_timestamp))
     transmit_timestamp = bytearray(pack_fixed64(response.tx_timestamp))
 
-    xored_data = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
+    #Modify flags in receive_timestamp
+    if last_packet:
+        #Set "last packet" flag
+        receive_timestamp[7] |= (1 << 8)
+
+        #Indicate number of bytes to read from transmit_timestamp
+        byte_count_flag_position = 6 #changing bits 6 and 7
+        bit_mask = 0b11 << byte_count_flag_position #mask = 00000110
+        receive_timestamp[7] &= ~bit_mask #clear counter flag bits
+        receive_timestamp[7] |= (len(data) << byte_count_flag_position)
+    else:
+        #Final byte bits: xxxxx110
+        receive_timestamp[7] |= (1 << 6)
+        receive_timestamp[7] |= (1 << 7)
+        receive_timestamp[7] |= (0 << 8)
+
+    #TODO Set sequnce number
     
+
     #Overwrite the final 4 bytes of transmit_timestamp with data
+    xored_data = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
     for i in range(0, len(xored_data)):
         transmit_timestamp[i + 4] = xored_data[i]
 
