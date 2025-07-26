@@ -1,36 +1,78 @@
 import socket
 import ntplib
-import time
-import sys
 import struct
-from fxpmath import Fxp
+import math
+PRIVATE_KEY_WORD='Bruh'
+PRIVATE_KEY=PRIVATE_KEY_WORD.encode('ascii')
 
-def send_ntp_response():
+def pack_fixed32(float_value : float):
+    fraction, integer = math.modf(float_value)
+    integer = int(integer)
+    fraction = int(fraction * (2**16))
+
+    #!: Big endian
+    #H: unsigned short (2 bytes == 16 bits)
+    return struct.pack('!HH', integer, fraction)
+
+def pack_fixed64(float_value : float):
+    fraction, integer = math.modf(float_value)
+    integer = int(integer)
+    fraction = int(fraction * (2**32))
+
+    #!: Big endian
+    #I: unsigned int (4 bytes == 32 bits)
+    return struct.pack('!II', integer, fraction)
+
+def pack_data
+
+def send_ntp_response(sock : socket.socket, client_address : str, client_port : int):
+
     c = ntplib.NTPClient()
     response = c.request('time.google.com', version=3)
 
-    fixed_point_format = Fxp(None, signed=True, n_word=64, n_frac=32)
-    float_value = .001068
-    fixed_point_value = Fxp(float_value, like=fixed_point_format)
-    #print(struct.pack('>d', fixed_point_value))
-    print(fixed_point_value.hex())
+    #Hard-coded fields
+    flags = b'\x24'
+    peer_clock_stratum = b'\x02'
+    peer_polling_interval = b'\x00'
+    peer_clock_precision = b'\xe7'
+    reference_id = b'\xc2\x79\xcf\xf9'
 
-    #build NTP packet
-    flags = 0x24
-    peer_clock_stratum = 0x02
-    peer_polling_interval = 0x00
-    peer_clock_precision = 0xe7
-    root_delay = struct.pack('>d', response.root_delay)
-    root_dispersion = struct.pack('>d', response.root_dispersion)
-    reference_id = 0xc279cff9
-    reference_timestamp = struct.pack('>d', response.ref_timestamp)
-    origin_timestamp = struct.pack('>d', response.orig_timestamp)
-    receive_timestamp = struct.pack('>d', response.recv_timestamp)
-    transmit_timestamp = struct.pack('>d', response.tx_timestamp)
+    #Fixed-32 values
+    root_delay = pack_fixed32(response.root_delay)
+    root_dispersion = pack_fixed32(response.root_dispersion)
 
-    #print(type(response.root_dispersion))
+    #Fixed-64 values
+    reference_timestamp = pack_fixed64(response.ref_timestamp)
+    origin_timestamp = pack_fixed64(response.orig_timestamp)
+    receive_timestamp = pack_fixed64(response.recv_timestamp)
 
-def receive_ntp_request():
-    y = 0
+    #transmit_timestamp = pack_fixed64(response.tx_timestamp)
+    transmit_timestamp_int = struct.pack('!I', int(response.tx_timestamp))
+    data = b'\x65\x76\x61\x6e'
+    xored = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
+    transmit_timestamp_message = xored
 
-send_ntp_response()
+    #Build packet
+    packet = b''
+    packet += flags
+    packet += peer_clock_stratum
+    packet += peer_polling_interval
+    packet += peer_clock_precision
+    packet += root_delay
+    packet += root_dispersion
+    packet += reference_id
+    packet += reference_timestamp
+    packet += origin_timestamp
+    packet += receive_timestamp
+    packet += transmit_timestamp_int
+    packet += transmit_timestamp_message
+
+    sock.sendto(packet, (client_address, client_port))
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 123))
+
+client_address = "127.0.0.1"
+client_port = 8080
+
+send_ntp_response(sock, client_address, client_port)
