@@ -23,9 +23,7 @@ def pack_fixed64(float_value : float):
     #I: unsigned int (4 bytes == 32 bits)
     return struct.pack('!II', integer, fraction)
 
-def pack_data
-
-def send_ntp_response(sock : socket.socket, client_address : str, client_port : int):
+def send_ntp_response(sock : socket.socket, client_address : str, client_port : int, data : bytes):
 
     c = ntplib.NTPClient()
     response = c.request('time.google.com', version=3)
@@ -45,12 +43,13 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
     reference_timestamp = pack_fixed64(response.ref_timestamp)
     origin_timestamp = pack_fixed64(response.orig_timestamp)
     receive_timestamp = pack_fixed64(response.recv_timestamp)
+    transmit_timestamp = bytearray(pack_fixed64(response.tx_timestamp))
 
-    #transmit_timestamp = pack_fixed64(response.tx_timestamp)
-    transmit_timestamp_int = struct.pack('!I', int(response.tx_timestamp))
-    data = b'\x65\x76\x61\x6e'
     xored = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
-    transmit_timestamp_message = xored
+    
+    #Overwrite the final 4 bytes of transmit_timestamp with data
+    for i in range(0, len(xored)):
+        transmit_timestamp[i + 4] = xored[i]
 
     #Build packet
     packet = b''
@@ -64,8 +63,7 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
     packet += reference_timestamp
     packet += origin_timestamp
     packet += receive_timestamp
-    packet += transmit_timestamp_int
-    packet += transmit_timestamp_message
+    packet += transmit_timestamp
 
     sock.sendto(packet, (client_address, client_port))
 
@@ -75,4 +73,15 @@ sock.bind(("127.0.0.1", 123))
 client_address = "127.0.0.1"
 client_port = 8080
 
-send_ntp_response(sock, client_address, client_port)
+message = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+data = b''
+for char in message:
+    data += char.encode('ascii')
+    if len(data) == 4:
+        send_ntp_response(sock, client_address, client_port, data)
+        data = b''
+
+#Send remaining data (<4 bytes)
+if len(data) != 0:
+    send_ntp_response(sock, client_address, client_port, data)
