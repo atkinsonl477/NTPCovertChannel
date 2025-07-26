@@ -2,6 +2,7 @@ import socket
 import ntplib
 import struct
 import math
+
 PRIVATE_KEY_WORD='Bruh'
 PRIVATE_KEY=PRIVATE_KEY_WORD.encode('ascii')
 
@@ -45,11 +46,11 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
     receive_timestamp = pack_fixed64(response.recv_timestamp)
     transmit_timestamp = bytearray(pack_fixed64(response.tx_timestamp))
 
-    xored = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
+    xored_data = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
     
     #Overwrite the final 4 bytes of transmit_timestamp with data
-    for i in range(0, len(xored)):
-        transmit_timestamp[i + 4] = xored[i]
+    for i in range(0, len(xored_data)):
+        transmit_timestamp[i + 4] = xored_data[i]
 
     #Build packet
     packet = b''
@@ -73,15 +74,20 @@ sock.bind(("127.0.0.1", 123))
 client_address = "127.0.0.1"
 client_port = 8080
 
-message = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+while(True):
+    message = input("Type your message.\nTo exit, press Enter.\n\n")
+    if len(message) == 0:
+        exit(0)
 
-data = b''
-for char in message:
-    data += char.encode('ascii')
-    if len(data) == 4:
+    data = b''
+    for char in message:
+        data += char.encode('ascii')
+        if len(data) == 4:
+            send_ntp_response(sock, client_address, client_port, data)
+            data = b''
+
+    #Send remaining data (<4 bytes)
+    if len(data) != 0:
         send_ntp_response(sock, client_address, client_port, data)
-        data = b''
-
-#Send remaining data (<4 bytes)
-if len(data) != 0:
-    send_ntp_response(sock, client_address, client_port, data)
+    
+    print("\nMessage sent to implant.\n")
