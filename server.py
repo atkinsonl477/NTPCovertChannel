@@ -13,7 +13,8 @@ def insertSorted(byteCode: bytes, number: int):
 def constructFinalMessage() -> bytes:
     finalBytes = b''
     for byteCode in data:
-        finalBytes += byteCode[0]
+        b, num = byteCode
+        finalBytes += b
         
     return finalBytes
 
@@ -29,18 +30,20 @@ while True:
     currentByteOnKey = 0
     lastPacket = 0
     isDone = False
-    while not isDone or len(data) < finalSize:
+    while not isDone or (len(data) < finalSize + 1):
         print("Receiving Packet")
         packet, addr = sock.recvfrom(1024)
-        print(packet)
+        #print(packet)
         ip, port = addr
     
+        #print("Ports Binary:",bin(port))
         # Encoded Data
         bytesToDecode = packet[44:48]
         # Finished Bit (15)
         LastSeq = port & 0x1
         # Bytes To Read from this packet (13-14)
-        bytesToRead = (int)(port & 0x6) >> 1
+        # print (bin(port & 0x6))
+        bytesToRead = (int)((port & 0x6) >> 1) + 1
         # Sequence Number (0-12) (32 kB max per message)
         seqNum = (int)(port & 0xFFF8) >> 3
         
@@ -48,24 +51,25 @@ while True:
         
         # Last packet is being sent here
         if LastSeq == 0x1:
-            print("Got to end of packet, Bytes left to read:", bytesToRead)
+            print("Got to end of packet, packets we need to read:", seqNum)
             isDone = True
             finalSize = seqNum
 
         rawBytes = b''
         for i in range(bytesToRead):
-            print(i, end=" ")
-            print("Xoring these values", KEY[i], bytesToDecode[i])
+            #print(i, end=" ")
+            #print("Xoring these values", KEY[i], bytesToDecode[i])
             rawBytes += bytes([KEY[i] ^ bytesToDecode[i]])
-        insertSorted(bytes, seqNum)
+        insertSorted(rawBytes, seqNum)
         packetsReceived += 1
         
-        print("__New Packet__",data,"___")
+       #print("__New Packet__",data,"___")
         
     finalMessage = constructFinalMessage()
     print(packetsReceived, "Packets Received, message decoded is")
     print(finalMessage)
     packetsReceived = 0
+    data = []
     
         
         
