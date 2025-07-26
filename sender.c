@@ -48,7 +48,17 @@ unsigned short checksum(void *vdata, size_t length) {
 
 
 
-int main() {
+int main(int argc, char *argv[]) {
+
+    unsigned int deltaBetweenPackets = 0;
+
+    // specify time between packets
+    if (argc > 1) {
+        deltaBetweenPackets = atoi(argv[1]);
+        printf("Specified Delta of %d\n", deltaBetweenPackets);
+    }
+    
+
     char packet[4096];
     memset(packet, 0, 4096);
 
@@ -131,7 +141,7 @@ int main() {
                 }
                 else {
                     //udph->source = htons(SRC_PORT);
-                    printf("XORing %c with %c\n", buf[currentIndex * 4 + i], KEY[i]);
+                    //printf("XORing %c with %c\n", buf[currentIndex * 4 + i], KEY[i]);
                     pack[i] = KEY[i] ^ buf[currentIndex * 4 + i];
                     //memcpy(data + 44 + i, &buf + (currentIndex * 4) + i, 1);
                 }
@@ -139,10 +149,10 @@ int main() {
             }
 
             if (buf[currentIndex * 4 + 4] == '\0' && !smallPacket) {
-                        printf("Reached End of Line On Last byte in chunk\n");
+                        //printf("Reached End of Line On Last byte in chunk\n");
                         uint16_t finishByte = 0b111 | (currentIndex << 3);
                         udph->source = htons(finishByte);
-                        printf("Ending The Message\n");
+                        //printf("Ending The Message\n");
                         
                     }
             else if (!smallPacket) {
@@ -156,7 +166,7 @@ int main() {
             //printf(buf[currentIndex * 4]);
             //printf("\n");
             //udph->check = checksum(udph, sizeof(struct udphdr));
-            printf("Sending Packet\n");
+            //printf("Sending Packet\n");
             if (sendto(s, packet, ntohs(iph->tot_len), 0,
                (struct sockaddr *)&sin, sizeof(sin)) < 0) {
                 perror("sendto");
@@ -164,9 +174,10 @@ int main() {
             }
             currentIndex++;
 
+            sleep(deltaBetweenPackets);
         
         }
-        printf("Total Packets Sent: %d\n", currentIndex);
+        printf("Message Sent, Total Packets: %d\n", currentIndex);
     }
 
     
