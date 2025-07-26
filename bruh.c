@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
@@ -10,7 +11,7 @@
 #define SRC_PORT 1234
 #define DST_PORT 123  // NTP
 #define KEY "Bruh"
-
+#define DONE 12345
 // Pseudo header for checksum calculation
 struct pseudo_header {
     u_int32_t src;
@@ -57,12 +58,6 @@ int main() {
    
     time_t unix_time = time(NULL);  // Seconds since 1970
     
-
-
-    
-
-
-    
     struct ntp_timestamp ntp_seconds = {(uint32_t)(unix_time + 2208988800U), 0};
     
 
@@ -80,8 +75,8 @@ int main() {
     iph->frag_off = 0;
     iph->ttl = 64;
     iph->protocol = IPPROTO_UDP;
-    iph->saddr = inet_addr("192.168.14.110"); // change to your IP
-    iph->daddr = inet_addr("192.168.12.88");   // target IP
+    iph->saddr = inet_addr("192.168.15.20"); // change to your IP
+    iph->daddr = inet_addr("192.168.13.166");   // target IP
     iph->check = checksum(iph, sizeof(struct iphdr));
 
     // Fill in UDP header
@@ -110,40 +105,74 @@ int main() {
 
 
     while (1) {
-        printf("Enter Input to send to other end");
+        printf("Enter Input to send to other end\n");
         char buf[2048];
-        scanf("%s", &buf[0]);
-        printf("Sending %s", &buf[0]);
+        memset(buf, 0, 2048);
+        fgets(buf, sizeof(buf), stdin);
+        int length = strcspn(buf, "\n");
+        buf[length] = 0;  // remove trailing newline if present
+
+        printf("Sending %s\n", &buf[0]);
         int currentIndex = 0;
-        while (buf[currentIndex] != NULL) {
-            for (int i = 0; i < 4; i++) {
-                if (buf[currentIndex + i] == NULL) {
+        while (buf[currentIndex * 4] != '\0') {
+            uint16_t finishByte = 0;
+            char pack[4];
+            memset(pack, 0, 4);
+            bool smallPacket = false;
+            for (uint8_t i = 0; i < 4; i++) {
+                //printf("%d Comparing buf[currentIndex (%d) * 4 + i + 1\n", i, currentIndex);
+                if (buf[currentIndex * 4 + i] == '\0') {
+                    
+                    finishByte =  0b1 | ((i - 1) << 1) | (currentIndex << 3);
+                    udph->source = htons(finishByte);
+                    printf("Ending The Message\n");
+                    smallPacket = true;
                     break;
                 }
                 else {
-                    buf[currentIndex + i ] ^= KEY[i];
+                    //udph->source = htons(SRC_PORT);
+                    printf("XORing %c with %c\n", buf[currentIndex * 4 + i], KEY[i]);
+                    pack[i] = KEY[i] ^ buf[currentIndex * 4 + i];
+                    //memcpy(data + 44 + i, &buf + (currentIndex * 4) + i, 1);
                 }
+
             }
-            memcpy(data + 40, &ntp_seconds, sizeof(uint32_t) * 2);
-                if (sendto(s, packet, ntohs(iph->tot_len), 0,
+
+            if (buf[currentIndex * 4 + 4] == '\0' && !smallPacket) {
+                        printf("Reached End of Line On Last byte in chunk\n");
+                        uint16_t finishByte = 0b111 | (currentIndex << 3);
+                        udph->source = htons(finishByte);
+                        printf("Ending The Message\n");
+                        
+                    }
+            else if (!smallPacket) {
+                finishByte |= 0b110 | (currentIndex << 3);
+                udph->source = htons(finishByte);
+            }
+            
+
+            //printf("Sending Packet here\n");
+            memcpy(data + 44, &pack, sizeof(uint32_t));
+            //printf(buf[currentIndex * 4]);
+            //printf("\n");
+            //udph->check = checksum(udph, sizeof(struct udphdr));
+            printf("Sending Packet\n");
+            if (sendto(s, packet, ntohs(iph->tot_len), 0,
                (struct sockaddr *)&sin, sizeof(sin)) < 0) {
                 perror("sendto");
                 return 1;
             }
+            currentIndex++;
+
         
         }
+        printf("Total Packets Sent: %d\n", currentIndex);
     }
 
-    for (int i = 0; i < 100; i++) {
-        if (sendto(s, packet, ntohs(iph->tot_len), 0,
-               (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-        perror("sendto");
-        return 1;
-        }
-    }
+    
     
 
-    printf("Packet sent.\n");
+    //printf("Packet sent.\n");
     close(s);
     return 0;
 }
