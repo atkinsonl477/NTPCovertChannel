@@ -1,4 +1,5 @@
 import socket
+import struct
 
 data = []
 finalSize = 0
@@ -25,13 +26,27 @@ sock.bind(('0.0.0.0', 123))
 packetsReceived = 0
 
 print("Listening on UDP port 123...")
+
+# Must receive first packet to know IP
+packet, addr = sock.recvfrom(1024)
+packet = bytearray(packet)
+ip, port = addr
+ipBytes = socket.inet_aton(ip)
+portBytes = struct.pack("!H", port)
+packet[:4] = ipBytes
+packet[4:6] = portBytes
+
+# forward packet to attackbox.py
+sock.sendto(packet, ('127.0.0.1', 1234))
+
 while True:
+    
     constructedPacket = []
     currentByteOnKey = 0
     lastPacket = 0
     isDone = False
     while not isDone or (len(data) < finalSize + 1):
-        print("Receiving Packet")
+        #print("Receiving Packet")
         packet, addr = sock.recvfrom(1024)
         #print(packet)
         ip, port = addr
@@ -47,11 +62,11 @@ while True:
         # Sequence Number (0-12) (32 kB max per message)
         seqNum = (int)(port & 0xFFF8) >> 3
         
-        print("Sequence done?", LastSeq, "bytesToRead:", bytesToRead, "Sequence Number:", seqNum)
+        #print("Sequence done?", LastSeq, "bytesToRead:", bytesToRead, "Sequence Number:", seqNum)
         
         # Last packet is being sent here
         if LastSeq == 0x1:
-            print("Got to end of packet, packets we need to read:", seqNum)
+            #print("Got to end of packet, packets we need to read:", seqNum)
             isDone = True
             finalSize = seqNum
 
@@ -65,7 +80,7 @@ while True:
         
        #print("__New Packet__",data,"___")
         
-    finalMessage = constructFinalMessage()
+    finalMessage = constructFinalMessage().decode('utf-8')
     print(packetsReceived, "Packets Received, message decoded is")
     print(finalMessage)
     packetsReceived = 0

