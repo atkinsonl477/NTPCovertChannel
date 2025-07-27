@@ -129,6 +129,9 @@ int main(int argc, char *argv[]) {
     
     struct ntp_timestamp ntp_seconds = {(uint32_t)(unix_time + 2208988800U), 0};
     
+    // Must set mode of NTP to client
+    memset(data, 0x23, 1);
+    
     memcpy(data + 40, &ntp_seconds, sizeof(uint32_t) * 2);
 
     // Fill in IP header
