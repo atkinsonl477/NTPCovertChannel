@@ -185,11 +185,10 @@ int main(int argc, char *argv[]) {
     sin.sin_addr.s_addr = iph->daddr;
 
     if (sendto(s, packet, ntohs(iph->tot_len), 0,
-               (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-                perror("sendto");
-                //printf("errno: %d\n", errno);
-                return 1;
-            }
+            (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+        perror("sendto");
+        return 1;
+    }
 
     while (1) {
         printf("Enter Command to send output to other end\n");
