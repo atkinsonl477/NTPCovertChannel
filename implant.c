@@ -8,10 +8,10 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 
-
 #define DST_PORT 123  // NTP
 #define KEY "Bruh"
 #define DONE 12345
+
 // Pseudo header for checksum calculation
 struct pseudo_header {
     u_int32_t src;
@@ -25,8 +25,6 @@ struct ntp_timestamp {
     uint32_t seconds;
     uint32_t fraction;
 };
-
-
 
 // Checksum calculation
 unsigned short checksum(void *vdata, size_t length) {
@@ -45,8 +43,6 @@ unsigned short checksum(void *vdata, size_t length) {
     return ~sum;
 };
 
-
-
 bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
     char buf[32768];
     printf("Waiting once again\n");
@@ -56,7 +52,7 @@ bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
     bool isDone = false;
     int packetsReceived = 0;
     int finalPacketCount = INT32_MAX;
-    while (isDone == 0|| packetsReceived < finalPacketCount) {
+    while (isDone == 0 || packetsReceived < finalPacketCount) {
         memset(buf, 0, sizeof(buf));
         int dataAmount = recvfrom(recvSock, buf, sizeof(buf), 0,(struct sockaddr *)&receiveAddr, (socklen_t*)&saddrLen);
         if (dataAmount < 0) {
@@ -72,7 +68,6 @@ bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
             // NTP Packet, We know that this is probably coming from our server
             char *address = inet_ntoa(((struct sockaddr_in *)&receiveAddr)->sin_addr);
             
-
             // If they are not the ip we're looking for (ie an actual NTP server), ignore the packet
             if (strncmp(address, DST_IP, sizeof(address)) == 0) {
                 printf("The last packet been sent? %d Packets Received %d Packets Needed %d", isDone, packetsReceived, finalPacketCount);
@@ -104,17 +99,11 @@ bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
                 packetsReceived++;
 
             }
-
         }
     }
     
-
-
     return true;
 }
-
-
-
 
 int main(int argc, char *argv[]) {
 
@@ -133,7 +122,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-
     char packet[4096];
     memset(packet, 0, 4096);
 
