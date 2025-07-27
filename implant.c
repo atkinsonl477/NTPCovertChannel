@@ -46,24 +46,6 @@ unsigned short checksum(void *vdata, size_t length) {
 };
 
 
-void print_hex(const void *data, size_t len) {
-    const uint8_t *byte = (const uint8_t *)data;
-    for (size_t i = 0; i < len; i++) {
-        printf("%02x ", byte[i]);
-        if ((i + 1) % 16 == 0) printf("\n");
-    }
-    printf("\n");
-}
-
-void print_binary_uint16(uint16_t n) {
-    for (int i = 15; i >= 0; i--) {
-        printf("%u", (n >> i) & 1);
-        if (i % 8 == 0 && i != 0) {
-            printf(" "); // Optional: space between bytes
-        }
-    }
-    printf("\n");
-}
 
 bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
     char buf[32768];
