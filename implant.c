@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
+#include <time.h>
 
 
 #define DST_PORT 123  // NTP
@@ -75,21 +76,16 @@ bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
 
             // If they are not the ip we're looking for (ie an actual NTP server), ignore the packet
             if (strncmp(address, DST_IP, sizeof(address)) == 0) {
-                printf("The last packet been sent? %d Packets Received %d Packets Needed %d", isDone, packetsReceived, finalPacketCount);
 
                 printf("Received a packet from %s\n", address);
-                print_hex(data + 32, 16);
                 uint16_t covertInformation;
                 memcpy(&covertInformation + 1, data + 38, sizeof(uint8_t));
                 memcpy(&covertInformation, data + 39, sizeof(uint8_t));
-                print_binary_uint16(covertInformation);
 
                 // Port is done (15)
                 isDone = covertInformation & 0x1;
                 uint8_t bytesToRead = ((covertInformation & 0x6) >> 1 ) + 1;
                 uint16_t seqNum = (covertInformation & 0xFFFF8) >> 3;
-
-                printf("IsDone? %d bytesToRead: %d, seqNum: %d\n", isDone, bytesToRead, seqNum);
 
                 // Decode Packet
                 for (int i = 0; i < bytesToRead; i++) {
